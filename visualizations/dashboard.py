@@ -243,13 +243,13 @@ class F1Visualizer:
                 COUNT(DISTINCT lt.race_id) as races,
                 COUNT(lt.lap_time_id) as total_laps,
                 CASE 
-                    WHEN lt.milliseconds IS NOT NULL AND lt.milliseconds > 0 
-                    THEN AVG(CAST(lt.milliseconds AS REAL))
+                    WHEN SUM(CASE WHEN lt.milliseconds IS NOT NULL AND lt.milliseconds > 0 THEN 1 ELSE 0 END) > 0
+                    THEN AVG(CASE WHEN lt.milliseconds IS NOT NULL AND lt.milliseconds > 0 THEN CAST(lt.milliseconds AS REAL) ELSE NULL END)
                     ELSE NULL
                 END as avg_lap_time,
                 CASE 
-                    WHEN lt.milliseconds IS NOT NULL AND lt.milliseconds > 0 
-                    THEN MIN(CAST(lt.milliseconds AS REAL))
+                    WHEN SUM(CASE WHEN lt.milliseconds IS NOT NULL AND lt.milliseconds > 0 THEN 1 ELSE 0 END) > 0
+                    THEN MIN(CASE WHEN lt.milliseconds IS NOT NULL AND lt.milliseconds > 0 THEN CAST(lt.milliseconds AS REAL) ELSE NULL END)
                     ELSE NULL
                 END as best_lap_time,
                 COUNT(DISTINCT CASE WHEN lt.position = 1 THEN lt.lap END) as laps_led
@@ -258,6 +258,7 @@ class F1Visualizer:
             WHERE (lt.milliseconds IS NOT NULL AND lt.milliseconds > 0) OR lt.time IS NOT NULL
             GROUP BY d.driver_id, d.full_name, d.number
             HAVING COUNT(lt.lap_time_id) > 0
+            ORDER BY avg_lap_time
         """
         df = self._get_dataframe(query)
         
