@@ -235,33 +235,47 @@ class F1Visualizer:
     
     def plot_driver_statistics_dashboard(self, save: bool = True):
         """Create comprehensive driver statistics dashboard."""
-        # Get driver statistics
+        # Get driver statistics - calculate milliseconds from time string if needed
         query = """
             SELECT 
                 d.full_name,
                 d.number,
                 COUNT(DISTINCT lt.race_id) as races,
                 COUNT(lt.lap_time_id) as total_laps,
-                AVG(CAST(lt.milliseconds AS REAL)) as avg_lap_time,
-                MIN(CAST(lt.milliseconds AS REAL)) as best_lap_time,
+                CASE 
+                    WHEN lt.milliseconds IS NOT NULL AND lt.milliseconds > 0 
+                    THEN AVG(CAST(lt.milliseconds AS REAL))
+                    ELSE NULL
+                END as avg_lap_time,
+                CASE 
+                    WHEN lt.milliseconds IS NOT NULL AND lt.milliseconds > 0 
+                    THEN MIN(CAST(lt.milliseconds AS REAL))
+                    ELSE NULL
+                END as best_lap_time,
                 COUNT(DISTINCT CASE WHEN lt.position = 1 THEN lt.lap END) as laps_led
             FROM drivers d
-            LEFT JOIN lap_times lt ON d.driver_id = lt.driver_id
-            WHERE lt.milliseconds IS NOT NULL
+            INNER JOIN lap_times lt ON d.driver_id = lt.driver_id
+            WHERE (lt.milliseconds IS NOT NULL AND lt.milliseconds > 0) OR lt.time IS NOT NULL
             GROUP BY d.driver_id, d.full_name, d.number
-            HAVING total_laps > 0
-            ORDER BY avg_lap_time
+            HAVING COUNT(lt.lap_time_id) > 0
         """
         df = self._get_dataframe(query)
         
-        # Ensure numeric types
+        if df.empty:
+            print("No driver statistics available")
+            return
+        
+        # Ensure numeric types - must happen before any operations
         df['avg_lap_time'] = pd.to_numeric(df['avg_lap_time'], errors='coerce')
         df['best_lap_time'] = pd.to_numeric(df['best_lap_time'], errors='coerce')
         df['total_laps'] = pd.to_numeric(df['total_laps'], errors='coerce')
         df['races'] = pd.to_numeric(df['races'], errors='coerce')
         
+        # Remove rows with invalid data
+        df = df.dropna(subset=['avg_lap_time'])
+        
         if df.empty:
-            print("No driver statistics available")
+            print("No valid driver statistics available")
             return
         
         # Create subplots
