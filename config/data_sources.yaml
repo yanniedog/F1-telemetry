@@ -1,0 +1,139 @@
+# F1 Historical Dataset - Data Sources Configuration
+
+# Ergast API (Historical F1 data)
+ergast:
+  base_url: "https://ergast.com/api/f1"
+  rate_limit:
+    max_calls: 200
+    period: 60  # seconds
+  endpoints:
+    seasons: "/seasons.json"
+    races: "/{year}/races.json"
+    drivers: "/drivers.json"
+    constructors: "/constructors.json"
+    circuits: "/circuits.json"
+    results: "/{year}/{round}/results.json"
+    lap_times: "/{year}/{round}/laps.json"
+    pit_stops: "/{year}/{round}/pitstops.json"
+    qualifying: "/{year}/{round}/qualifying.json"
+  note: "Ergast API is deprecated end of 2024. Consider migrating to Jolpica F1 API."
+
+# OpenF1 API (Modern telemetry data)
+openf1:
+  base_url: "https://api.openf1.org/v1"
+  rate_limit:
+    max_calls: 100
+    period: 60  # seconds
+  endpoints:
+    sessions: "/sessions"
+    laps: "/laps"
+    drivers: "/drivers"
+    car_data: "/car_data"
+    position: "/position"
+    track_status: "/track_status"
+    stints: "/stints"
+    weather: "/weather"
+    location: "/location"
+  authentication:
+    required: false
+    # For real-time data, authentication may be required
+    token_url: "https://api.openf1.org/token"
+  note: "Free historical data available. Real-time data may require authentication."
+
+# FastF1 Library (Session data and telemetry)
+fastf1:
+  rate_limit:
+    max_calls: 50
+    period: 60  # seconds
+  cache_dir: "cache/fastf1"
+  data_dir: "cache/fastf1_data"
+  note: "Uses official F1 timing data. Requires internet connection for first-time session loading."
+
+# StatsF1 (Historical race reports and statistics)
+statsf1:
+  base_url: "https://www.statsf1.com"
+  rate_limit:
+    max_calls: 30
+    period: 60  # seconds
+  endpoints:
+    race_reports: "/en/{year}/{circuit}.aspx"
+    safety_car: "/en/statistiques/pilote/voiture-securite.aspx"
+    red_flags: "/en/statistiques/gp/drapeau-rouge.aspx"
+  user_agent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+  note: "Web scraping. Be respectful with rate limits."
+
+# FIA (Official race classification PDFs)
+fia:
+  base_url: "https://www.fia.com"
+  rate_limit:
+    max_calls: 20
+    period: 60  # seconds
+  endpoints:
+    documents: "/documents/category/101"  # Race classification documents
+    race_classification: "/documents/race-classification-{year}-{round}"
+  user_agent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+  pdf_dir: "cache/fia_pdfs"
+  note: "PDF parsing. Formats may vary across years."
+
+# F1.com (Official website data)
+f1com:
+  base_url: "https://www.formula1.com"
+  rate_limit:
+    max_calls: 30
+    period: 60  # seconds
+  endpoints:
+    results: "/en/results.html/{year}/races.html"
+    race_results: "/en/results.html/{year}/races/{round}/{circuit}/race-result.html"
+    session_data: "/en/results.html/{year}/races/{round}/{circuit}/{session}.html"
+    circuit_info: "/en/racing/{year}/{circuit}.html"
+  api_base: "https://api.formula1.com/v1"
+  user_agent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+  note: "Web scraping. Official F1 website data."
+
+# Wikipedia (Cross-reference data)
+wikipedia:
+  base_url: "https://en.wikipedia.org"
+  rate_limit:
+    max_calls: 50
+    period: 60  # seconds
+  endpoints:
+    race_pages: "/wiki/{year}_Formula_One_World_Championship"
+  note: "Used only for cross-referencing. Not a primary data source."
+
+# Data availability by source
+data_availability:
+  # Available for all years (1950-present)
+  all_years:
+    - "ergast.seasons"
+    - "ergast.races"
+    - "ergast.drivers"
+    - "ergast.constructors"
+    - "ergast.circuits"
+    - "ergast.results"
+    - "wikipedia.race_pages"
+  
+  # Available from 1980+
+  from_1980:
+    - "ergast.lap_times"
+    - "ergast.pit_stops"
+  
+  # Available from 2012+
+  from_2012:
+    - "ergast.pit_stops.duration"
+  
+  # Available from 2018+ only
+  from_2018:
+    - "openf1.telemetry"
+    - "openf1.track_status"
+    - "fastf1.sector_times"
+    - "fastf1.tyre_compounds"
+    - "fastf1.weather"
+    - "fastf1.micro_sectors"
+    - "f1com.session_data"
+  
+  # Not available publicly
+  not_available:
+    - "Detailed telemetry pre-2018"
+    - "Comprehensive incident data for all years"
+    - "Some historical weather data"
+

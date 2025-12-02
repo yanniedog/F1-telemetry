@@ -1,0 +1,87 @@
+# F1 Historical Dataset - Main Configuration
+
+# Database configuration
+database:
+  type: "sqlite"  # or "postgresql"
+  sqlite_path: "data/f1_dataset.db"
+  postgresql:
+    host: "localhost"
+    port: 5432
+    database: "f1_dataset"
+    user: "f1_user"
+    password: "f1_password"
+
+# Cache configuration
+cache:
+  enabled: true
+  cache_dir: "cache"
+  default_ttl: 86400  # 24 hours in seconds
+  use_pickle: true
+
+# Logging configuration
+logging:
+  enabled: true
+  log_dir: "logs"
+  log_level: "INFO"  # DEBUG, INFO, WARNING, ERROR, CRITICAL
+  log_to_file: true
+  log_to_console: true
+
+# Data fetching configuration
+fetching:
+  # Years to fetch (None = all years)
+  start_year: null  # 1950
+  end_year: null   # Current year
+  
+  # Which data sources to use
+  sources:
+    ergast: true
+    openf1: true
+    fastf1: true
+    statsf1: true
+    fia_pdf: true
+    f1com: true
+  
+  # Incremental updates (only fetch new data)
+  incremental: false
+  
+  # Parallel fetching (number of concurrent requests)
+  max_workers: 4
+  
+  # Retry configuration
+  max_retries: 3
+  retry_delay: 1.0  # seconds
+
+# ETL configuration
+etl:
+  # Data normalization
+  normalize_timestamps: true
+  normalize_timezone: "UTC"
+  align_lap_numbers: true
+  
+  # Data validation
+  validate_data: true
+  strict_validation: false  # If true, fail on validation errors
+  
+  # Driver matching
+  match_drivers: true
+  driver_matching_threshold: 0.85  # Similarity threshold (0-1)
+
+# Export configuration
+export:
+  csv:
+    enabled: true
+    output_dir: "exports/csv"
+    include_metadata: true
+  
+  parquet:
+    enabled: true
+    output_dir: "exports/parquet"
+    partition_by: "season"  # or "year"
+    compression: "snappy"
+
+# Performance settings
+performance:
+  batch_size: 1000
+  use_transactions: true
+  commit_interval: 10000
+
