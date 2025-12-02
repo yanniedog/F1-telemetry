@@ -35,6 +35,13 @@ class DatabaseInserter:
     
     def _get_or_create_race(self, cursor: sqlite3.Cursor, year: int, circuit_name: str, session_key: int) -> Optional[int]:
         """Get or create a race for the session."""
+        # Ensure year is an integer
+        if not isinstance(year, int):
+            try:
+                year = int(year)
+            except (ValueError, TypeError):
+                year = 2023  # Default fallback
+        
         # First, get or create season
         cursor.execute("SELECT season_id FROM seasons WHERE year = ?", (year,))
         season_row = cursor.fetchone()
@@ -66,29 +73,59 @@ class DatabaseInserter:
         if not circuit_id:
             return None
         
-        # Use session_key to create unique round number
-        # This ensures each session gets its own race entry
-        round_num = (session_key % 100) + 1  # Round number between 1-100
-        
-        # Get or create race
+        # First, try to find existing race for this circuit and season
         cursor.execute("""
             SELECT race_id FROM races 
-            WHERE season_id = ? AND circuit_id = ? AND round = ?
-        """, (season_id, circuit_id, round_num))
+            WHERE season_id = ? AND circuit_id = ?
+            LIMIT 1
+        """, (season_id, circuit_id))
         race_row = cursor.fetchone()
-        if not race_row:
+        
+        if race_row:
+            # Use existing race
+            return race_row[0]
+        
+        # No existing race found, create a new one
+        # Find the next available round number for this season
+        cursor.execute("""
+            SELECT MAX(round) FROM races WHERE season_id = ?
+        """, (season_id,))
+        max_round_row = cursor.fetchone()
+        next_round = (max_round_row[0] + 1) if max_round_row and max_round_row[0] is not None else 1
+        
+        # Ensure round number is within valid range (1-100)
+        if next_round > 100:
+            # If we've exceeded 100, use a hash-based approach
+            next_round = ((session_key % 100) + 1)
+            # Check if this round already exists for this season
             cursor.execute("""
-                INSERT OR IGNORE INTO races (season_id, round, circuit_id, name, date, race_date)
+                SELECT race_id FROM races WHERE season_id = ? AND round = ?
+            """, (season_id, next_round))
+            if cursor.fetchone():
+                # If collision, find next available
+                for r in range(1, 101):
+                    cursor.execute("""
+                        SELECT race_id FROM races WHERE season_id = ? AND round = ?
+                    """, (season_id, r))
+                    if not cursor.fetchone():
+                        next_round = r
+                        break
+        
+        # Create new race
+        try:
+            cursor.execute("""
+                INSERT INTO races (season_id, round, circuit_id, name, date, race_date)
                 VALUES (?, ?, ?, ?, ?, ?)
-            """, (season_id, round_num, circuit_id, f"{circuit_name} {year}", f"{year}-01-01", f"{year}-01-01"))
+            """, (season_id, next_round, circuit_id, f"{circuit_name} {year}", f"{year}-01-01", f"{year}-01-01"))
+            race_id = cursor.lastrowid
+        except sqlite3.IntegrityError:
+            # UNIQUE constraint failed, try to get existing race
             cursor.execute("""
                 SELECT race_id FROM races 
-                WHERE season_id = ? AND circuit_id = ? AND round = ?
-            """, (season_id, circuit_id, round_num))
+                WHERE season_id = ? AND round = ?
+            """, (season_id, next_round))
             race_row = cursor.fetchone()
             race_id = race_row[0] if race_row else None
-        else:
-            race_id = race_row[0]
         
         return race_id
     
@@ -118,15 +155,22 @@ class DatabaseInserter:
                 
                 # Get or create race
                 year = session.get('year') or 2023
+                # Ensure year is an integer
+                if not isinstance(year, int):
+                    try:
+                        year = int(year)
+                    except (ValueError, TypeError):
+                        year = 2023
+                
                 circuit_name = session.get('circuit_short_name') or session.get('location') or 'Unknown'
                 race_id = self._get_or_create_race(cursor, year, circuit_name, session_key)
                 
                 if not race_id:
                     continue
                 
-                # Parse date
+                # Parse date - ensure session_date_str is always a valid string
                 date_start = session.get('date_start')
-                session_date_str = f"{year}-01-01"
+                session_date_str = f"{year}-01-01"  # Default fallback
                 session_time_str = None
                 if date_start:
                     try:
@@ -138,6 +182,11 @@ class DatabaseInserter:
                         session_time_str = dt.strftime('%H:%M:%S')
                     except Exception as e:
                         self.logger.debug(f"Could not parse date {date_start}: {e}")
+                        # Keep default session_date_str
+                
+                # Ensure session_date_str is never None or empty
+                if not session_date_str or not isinstance(session_date_str, str):
+                    session_date_str = f"{year}-01-01"
                 
                 session_type = session.get('session_name', 'Race')
                 session_name = session.get('session_name', 'Race')
